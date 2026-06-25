@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Study Mood Tracker</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: sans-serif; background: #f9f9f9; color: #111; padding: 1.5rem; max-width: 480px; margin: auto; }
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+.month-label { font-size: 20px; font-weight: 500; }
+.nav-btn { background: none; border: 1px solid #ccc; border-radius: 8px; padding: 6px 14px; cursor: pointer; font-size: 16px; }
+.nav-btn:hover { background: #eee; }
+.weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 6px; }
+.weekday { text-align: center; font-size: 12px; color: #888; padding: 4px 0; }
+.grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.day { border-radius: 8px; border: 1px solid #e0e0e0; min-height: 52px; padding: 6px; cursor: pointer; background: #fff; display: flex; flex-direction: column; align-items: center; }
+.day:hover { border-color: #aaa; }
+.day.empty { background: none; border-color: transparent; cursor: default; }
+.day.today { border-color: #7F77DD; }
+.day-num { font-size: 12px; color: #888; margin-bottom: 4px; align-self: flex-start; }
+.day.today .day-num { color: #534AB7; font-weight: 600; }
+.mood-dot { width: 20px; height: 20px; border-radius: 50%; margin-top: 2px; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 1.25rem; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #555; }
+.legend-dot { width: 13px; height: 13px; border-radius: 50%; flex-shrink: 0; }
+.picker { position: fixed; background: #fff; border: 1px solid #ccc; border-radius: 12px; padding: 14px; display: none; z-index: 100; box-shadow: 0 4px 20px rgba(0,0,0,0.15); min-width: 200px; }
+.picker.show { display: block; }
+.picker-title { font-size: 13px; color: #888; margin-bottom: 10px; }
+.picker-opts { display: flex; flex-direction: column; gap: 6px; }
+.picker-opt { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; border: 1px solid #e0e0e0; background: #fff; }
+.picker-opt:hover { background: #f5f5f5; }
+.opt-dot { width: 13px; height: 13px; border-radius: 50%; flex-shrink: 0; }
+.clear-opt { font-size: 12px; color: #aaa; text-align: center; padding: 6px; cursor: pointer; margin-top: 4px; }
+.clear-opt:hover { color: #555; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 1.25rem; }
+.stat { background: #f0f0f0; border-radius: 8px; padding: 10px 12px; text-align: center; }
+.stat-num { font-size: 22px; font-weight: 500; }
+.stat-label { font-size: 11px; color: #888; margin-top: 2px; }
+.status-bar { margin-top: 1rem; font-size: 12px; color: #888; text-align: center; min-height: 18px; }
+.status-bar.error { color: #A32D2D; }
+.status-bar.success { color: #1D9E75; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <button class="nav-btn" onclick="changeMonth(-1)">&#8592;</button>
+  <span class="month-label" id="month-label"></span>
+  <button class="nav-btn" onclick="changeMonth(1)">&#8594;</button>
+</div>
+<div class="weekdays">
+  <div class="weekday">Sun</div><div class="weekday">Mon</div><div class="weekday">Tue</div>
+  <div class="weekday">Wed</div><div class="weekday">Thu</div><div class="weekday">Fri</div><div class="weekday">Sat</div>
+</div>
+<div class="grid" id="cal-grid"></div>
+<div class="stats">
+  <div class="stat"><div class="stat-num" id="s-great" style="color:#1D9E75">0</div><div class="stat-label">Great days</div></div>
+  <div class="stat"><div class="stat-num" id="s-okay" style="color:#BA7517">0</div><div class="stat-label">Okay days</div></div>
+  <div class="stat"><div class="stat-num" id="s-low" style="color:#A32D2D">0</div><div class="stat-label">Low days</div></div>
+</div>
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#1D9E75"></div> Great — really focused</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#BA7517"></div> Okay — getting by</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#A32D2D"></div> Low — struggled today</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#7F77DD"></div> Rest day</div>
+</div>
+<div class="status-bar" id="status-bar">Connecting to server...</div>
+
+<div class="picker" id="picker">
+  <div class="picker-title" id="picker-title">How was your day?</div>
+  <div class="picker-opts">
+    <div class="picker-opt" onclick="setMood('great')"><div class="opt-dot" style="background:#1D9E75"></div> Great — really focused</div>
+    <div class="picker-opt" onclick="setMood('okay')"><div class="opt-dot" style="background:#BA7517"></div> Okay — getting by</div>
+    <div class="picker-opt" onclick="setMood('low')"><div class="opt-dot" style="background:#A32D2D"></div> Low — struggled</div>
+    <div class="picker-opt" onclick="setMood('rest')"><div class="opt-dot" style="background:#7F77DD"></div> Rest day</div>
+  </div>
+  <div class="clear-opt" onclick="setMood(null)">Clear</div>
+</div>
+
+<script>
+const API_KEY = '$2a$10$bU2Z4mbw24dyqfvC5YJJ..eVij2XsdrwTS9/OQHQ3WzBFJ.7Hmz6e';
+const BASE_URL = 'https://api.jsonbin.io/v3';
+const MOOD_COLORS = { great:'#1D9E75', okay:'#BA7517', low:'#A32D2D', rest:'#7F77DD' };
+
+let data = {};
+let binId = null;
+let cur = new Date();
+let selKey = null;
+let saving = false;
+const picker = document.getElementById('picker');
+const statusBar = document.getElementById('status-bar');
+
+function setStatus(msg, type='') {
+  statusBar.textContent = msg;
+  statusBar.className = 'status-bar' + (type ? ' ' + type : '');
+}
+
+// Always fetch binId from JSONBin by searching bins
+async function getBinId() {
+  try {
+    const res = await fetch(`${BASE_URL}/b?page=1`, {
+      headers: { 'X-Access-Key': API_KEY }
+    });
+    const json = await res.json();
+    if (json && json.result) {
+      const found = json.result.find(b => b.snippetMeta && b.snippetMeta.name === 'study-mood-tracker');
+      if (found) return found.snippetMeta.id;
+    }
+    return null;
+  } catch(e) {
+    return null;
+  }
+}
+
+async function createBin() {
+  try {
+    const res = await fetch(`${BASE_URL}/b`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Access-Key': API_KEY,
+        'X-Bin-Name': 'study-mood-tracker',
+        'X-Bin-Private': 'true'
+      },
+      body: JSON.stringify({ moods: {} })
+    });
+    const json = await res.json();
+    if (json && json.metadata && json.metadata.id) {
+      return json.metadata.id;
+    }
+    return null;
+  } catch(e) {
+    return null;
+  }
+}
+
+async function loadFromBin(id) {
+  try {
+    const res = await fetch(`${BASE_URL}/b/${id}/latest`, {
+      headers: { 'X-Access-Key': API_KEY }
+    });
+    const json = await res.json();
+    if (json && json.record && json.record.moods) {
+      return json.record.moods;
+    }
+    return {};
+  } catch(e) {
+    return null;
+  }
+}
+
+async function saveToBin(id, moods) {
+  try {
+    const res = await fetch(`${BASE_URL}/b/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Access-Key': API_KEY
+      },
+      body: JSON.stringify({ moods: moods })
+    });
+    const json = await res.json();
+    return json && json.metadata ? true : false;
+  } catch(e) {
+    return false;
+  }
+}
+
+async function init() {
+  setStatus('Connecting to server...');
+
+  // Try to get existing bin
+  let id = localStorage.getItem('mood-bin-id');
+
+  if (!id) {
+    setStatus('Setting up your storage...');
+    id = await createBin();
+    if (id) {
+      localStorage.setItem('mood-bin-id', id);
+    } else {
+      setStatus('Could not connect. Check your internet.', 'error');
+      render();
+      return;
+    }
+  }
+
+  binId = id;
+  setStatus('Loading your data...');
+  const loaded = await loadFromBin(binId);
+
+  if (loaded === null) {
+    // bin might be deleted, create new one
+    setStatus('Creating new storage...');
+    localStorage.removeItem('mood-bin-id');
+    binId = await createBin();
+    if (binId) {
+      localStorage.setItem('mood-bin-id', binId);
+      data = {};
+      setStatus('Ready!', 'success');
+    } else {
+      setStatus('Connection failed. Check your internet.', 'error');
+    }
+  } else {
+    data = loaded;
+    setStatus('Data loaded!', 'success');
+  }
+
+  setTimeout(() => setStatus(''), 2000);
+  render();
+}
+
+function key(y, m, d) { return y + '-' + (m + 1) + '-' + d; }
+
+function render() {
+  const now = new Date();
+  const y = cur.getFullYear(), m = cur.getMonth();
+  document.getElementById('month-label').textContent = cur.toLocaleString('default', { month: 'long', year: 'numeric' });
+  const first = new Date(y, m, 1).getDay();
+  const days = new Date(y, m + 1, 0).getDate();
+  const grid = document.getElementById('cal-grid');
+  grid.innerHTML = '';
+  for (let i = 0; i < first; i++) {
+    const e = document.createElement('div'); e.className = 'day empty'; grid.appendChild(e);
+  }
+  for (let d = 1; d <= days; d++) {
+    const k = key(y, m, d);
+    const isToday = now.getFullYear() === y && now.getMonth() === m && now.getDate() === d;
+    const el = document.createElement('div');
+    el.className = 'day' + (isToday ? ' today' : '');
+    const num = document.createElement('div'); num.className = 'day-num'; num.textContent = d;
+    el.appendChild(num);
+    if (data[k]) {
+      const dot = document.createElement('div'); dot.className = 'mood-dot';
+      dot.style.background = MOOD_COLORS[data[k]];
+      el.appendChild(dot);
+    }
+    el.addEventListener('click', (e) => openPicker(e, k, d));
+    grid.appendChild(el);
+  }
+  updateStats(y, m);
+}
+
+function updateStats(y, m) {
+  let g = 0, o = 0, l = 0;
+  const days = new Date(y, m + 1, 0).getDate();
+  for (let d = 1; d <= days; d++) {
+    const v = data[key(y, m, d)];
+    if (v === 'great') g++;
+    else if (v === 'okay') o++;
+    else if (v === 'low') l++;
+  }
+  document.getElementById('s-great').textContent = g;
+  document.getElementById('s-okay').textContent = o;
+  document.getElementById('s-low').textContent = l;
+}
+
+function openPicker(e, k, d) {
+  selKey = k;
+  document.getElementById('picker-title').textContent = 'Day ' + d + ' — how was it?';
+  const rect = e.currentTarget.getBoundingClientRect();
+  picker.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+  picker.style.left = Math.min(rect.left, window.innerWidth - 220) + 'px';
+  picker.classList.add('show');
+  e.stopPropagation();
+}
+
+async function setMood(mood) {
+  if (!selKey) return;
+  if (mood) data[selKey] = mood;
+  else delete data[selKey];
+  picker.classList.remove('show');
+  render();
+
+  if (!binId) { setStatus('Not connected to server!', 'error'); return; }
+  if (saving) return;
+  saving = true;
+  setStatus('Saving...');
+  const ok = await saveToBin(binId, data);
+  saving = false;
+  if (ok) {
+    setStatus('Saved to server!', 'success');
+    setTimeout(() => setStatus(''), 2000);
+  } else {
+    setStatus('Save failed. Check internet.', 'error');
+  }
+}
+
+function changeMonth(dir) { cur.setMonth(cur.getMonth() + dir); render(); }
+
+document.addEventListener('click', () => picker.classList.remove('show'));
+picker.addEventListener('click', e => e.stopPropagation());
+
+init();
+</script>
+</body>
+</html>
